@@ -1762,36 +1762,35 @@ def aot_stage2_autograd(
                     placeholder_list[i] = ph_arg.as_strided(ph_arg.size(), real_stride)
 
             compiled_bw_func = None
-            if num_symints_saved_for_bw > 0:
-                try:
-                    # See Note: [Backward graph lazy lowering]
-                    with torch._subclasses.fake_tensor.unset_fake_temporarily():
-                        # If bw_module contains lifted constants, they will be real tensors stored as
-                        # GraphModule. Deepcopying tensors under fake mode is not supported and will
-                        # raise when attempting to set storage.
-                        bw_module_copy = copy.deepcopy(bw_module)
-                    compiled_bw_func = aot_config.bw_compiler(
-                        bw_module_copy, placeholder_list
-                    )
-                    del bw_module_copy
-                except Exception as e:
-                    exc = e
-                    trace_structured(
-                        "artifact",
-                        metadata_fn=lambda: {
-                            "name": "eager_compile_backwards_failure",
-                            "encoding": "string",
-                        },
-                        payload_fn=lambda: "\n".join(
-                            traceback.format_exception(
-                                type(exc), exc, exc.__traceback__
-                            )
-                        ),
-                    )
-                    log.warning(
-                        "failed to eagerly compile backwards for dynamic, suppressing in case backwards not needed",
-                        exc_info=True,
-                    )
+            try:
+                # See Note: [Backward graph lazy lowering]
+                with torch._subclasses.fake_tensor.unset_fake_temporarily():
+                    # If bw_module contains lifted constants, they will be real tensors stored as
+                    # GraphModule. Deepcopying tensors under fake mode is not supported and will
+                    # raise when attempting to set storage.
+                    bw_module_copy = copy.deepcopy(bw_module)
+                compiled_bw_func = aot_config.bw_compiler(
+                    bw_module_copy, placeholder_list
+                )
+                del bw_module_copy
+            except Exception as e:
+                exc = e
+                trace_structured(
+                    "artifact",
+                    metadata_fn=lambda: {
+                        "name": "eager_compile_backwards_failure",
+                        "encoding": "string",
+                    },
+                    payload_fn=lambda: "\n".join(
+                        traceback.format_exception(
+                            type(exc), exc, exc.__traceback__
+                        )
+                    ),
+                )
+                log.warning(
+                    "failed to eagerly compile backwards for dynamic, suppressing in case backwards not needed",
+                    exc_info=True,
+                )
             # Compiled autograd will run the bw_module in the backward pass,
             # so recompilation need happen anyway if the backward pass is ever
             # called.
