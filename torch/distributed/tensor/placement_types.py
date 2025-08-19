@@ -645,9 +645,9 @@ class Replicate(Placement):
 
         tensor = tensor.contiguous()
 
-        if src_data_rank is not None:
-            # perform broadcast from the src_data_rank as data source when it is not None
-            mesh_broadcast(tensor, mesh, mesh_dim=mesh_dim, group_src=src_data_rank)
+        # if src_data_rank is not None:
+        #     # perform broadcast from the src_data_rank as data source when it is not None
+        #     mesh_broadcast(tensor, mesh, mesh_dim=mesh_dim, group_src=src_data_rank)
         return tensor
 
 
