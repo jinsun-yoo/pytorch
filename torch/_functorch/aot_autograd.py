@@ -1104,7 +1104,11 @@ def aot_module_simplified(
                 fake_mode,
                 shape_env,
             )
+            import os
+            #os.environ["DISABLE_META_TENSOR"] = "True"
             aot_graph_capture = aot_stage1_graph_capture(aot_state, functional_call)
+            if os.environ.get("DISABLE_META_TENSOR", None) is not None:
+                del os.environ["DISABLE_META_TENSOR"]
             compiled_fn, _ = aot_stage2_compile(aot_state, aot_graph_capture)
 
     if isinstance(mod, torch._dynamo.utils.GmWrapper):

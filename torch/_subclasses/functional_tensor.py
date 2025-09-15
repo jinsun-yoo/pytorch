@@ -508,11 +508,21 @@ class FunctionalTensorMode(TorchDispatchMode):
                     # FunctionalTensorMode. If we call func() directly, we would need to exclude PreDispatch
                     # from the TLS in order to avoid infinite looping, but this would prevent us from coming
                     # back to PreDispatch later
+                    import os
+                    for mode in torch.utils._python_dispatch._get_current_dispatch_mode_stack():
+                        if isinstance(mode, torch.fx.experimental.proxy_tensor.ProxyTorchDispatchMode):
+                            continue
+                            os.environ["DISABLE_META_TENSOR"] = "True"
+                    import sys
+                    print(f"FunctionalTensorMode: dispatching {func}", file=sys.stderr)
+                    print(f"Current stack is: {torch.utils._python_dispatch._get_current_dispatch_mode_stack()}", file=sys.stderr)
                     outs_unwrapped = func._op_dk(
                         torch._C.DispatchKey.Functionalize,
                         *args_unwrapped,
                         **kwargs_unwrapped,
                     )
+                    if os.environ.get("DISABLE_META_TENSOR") is not None:
+                        del os.environ["DISABLE_META_TENSOR"]
 
                     if self.export:
                         if func == torch.ops.aten.dropout.default:
