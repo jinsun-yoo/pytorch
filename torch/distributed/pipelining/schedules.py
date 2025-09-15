@@ -836,8 +836,8 @@ class Schedule1F1B(PipelineScheduleSingle):
         """
         arg_mbs, kwarg_mbs = self._check_inputs(arg_mbs, kwarg_mbs, target_mbs, losses)
 
-        if not self._stage_initialized:
-            self._initialize_stage(arg_mbs[0], kwarg_mbs[0])
+        # if not self._stage_initialized:
+        #     self._initialize_stage(arg_mbs[0], kwarg_mbs[0])
 
         # Last stage has 1 warmup, second-to-last 2 warmups, ...
         # first stage `num_stages` warmups
