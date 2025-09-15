@@ -990,8 +990,17 @@ def proxy_call(
         name=proxy_mode.tracer.graph._target_to_str(func.overloadpacket.__name__),
     )
 
+    import os
+    deleted = False
+    if os.environ.get("DISABLE_META_TENSOR") is not None:
+        del os.environ["DISABLE_META_TENSOR"]
+        deleted = True
+    import sys
+    print(f"ProxyTensorDispatchMode: dispatching {func}", file=sys.stderr)
     with _enable_thunkify(proxy_mode.tracer):
         out = func(*args, **kwargs)
+    if deleted:
+        os.environ["DISABLE_META_TENSOR"] = "True"
 
     # In some circumstances, we will be tracing in a situation where a tensor
     # is *statically* known to be a constant (currently, this only happens if
