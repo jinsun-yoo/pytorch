@@ -3502,7 +3502,8 @@ def recv_object_list(
     )
 
     # Receive object sizes
-    rank_sizes = recv(object_sizes_tensor, src=src, group=group, group_src=group_src)
+    #rank_sizes = recv(object_sizes_tensor, group=group, group_src=group_src)
+    rank_sizes = torch.distributed._functional_collectives.recv([object_sizes_tensor], src=src, group=group)
 
     # Tensor to receive serialized objects into.
     object_tensor = torch.empty(  # type: ignore[call-overload]
@@ -3511,10 +3512,11 @@ def recv_object_list(
         device=current_device,
     )
 
-    rank_objects = recv(object_tensor, src=src, group=group, group_src=group_src)
-    assert rank_sizes == rank_objects, (
-        "Mismatch in return ranks for object sizes and objects."
-    )
+    rank_objects = torch.distributed._functional_collectives.recv([object_tensor], src=src, group=group)
+    # rank_objects = recv(object_tensor, src=src, group=group, group_src=group_src)
+    # assert rank_sizes == rank_objects, (
+    #     "Mismatch in return ranks for object sizes and objects."
+    # )
     # Deserialize objects using their stored sizes.
     offset = 0
     for i, obj_size in enumerate(object_sizes_tensor):

@@ -5,6 +5,7 @@ import warnings
 from typing import Any, cast, Optional, TYPE_CHECKING, Union
 
 import torch
+torch.ops.import_module("torch.distributed.faketensor")
 import torch.distributed as dist
 import torch.distributed.distributed_c10d as c10d
 from torch.distributed.device_mesh import DeviceMesh
@@ -140,6 +141,24 @@ def wait_tensor(tensor):
     """
     return torch.ops._c10d_functional.wait_tensor(tensor)  # type: ignore[attr-defined]
 
+
+def send(self: list[torch.Tensor], dst: int, group: RANK_TYPES, tag: str = ""):
+    """
+    Sends a tensor to the specified destination rank in the given process group.
+    """
+    group_name = _resolve_group_name(group, tag)
+    msg_tag_placeholder = 0
+    tensor_list = torch.ops._c10d_functional.send(self, dst, msg_tag_placeholder, group_name)
+    return list(map(_maybe_wrap_tensor, tensor_list))
+
+def recv(self: list[torch.Tensor], src: int, group: RANK_TYPES, tag: str = ""):
+    """
+    Receives a tensor from the specified source rank in the given process group.
+    """
+    group_name = _resolve_group_name(group, tag)
+    msg_tag_placeholder = 0
+    tensor_list = torch.ops._c10d_functional.recv(self, src, msg_tag_placeholder, group_name)
+    return list(map(_maybe_wrap_tensor, tensor_list))
 
 def broadcast(self: torch.Tensor, src: int, group: RANK_TYPES, tag: str = ""):
     """
