@@ -275,6 +275,33 @@ at::Tensor broadcast(
   return broadcast_(output, src, std::move(group_name));
 }
 
+std::vector<at::Tensor> send(
+    std::vector<at::Tensor> inputs,
+    int64_t dst,
+    int64_t tag,
+    std::string group_name) {
+  auto group = c10d::resolve_process_group(group_name);
+  auto work = group->send(inputs, dst, tag);
+  for (const auto& tensor : inputs) {
+    c10d::register_work(tensor, work);
+  }
+  return inputs;
+}
+
+
+std::vector<at::Tensor> recv(
+    std::vector<at::Tensor> inputs,
+    int64_t src,
+    int64_t tag,
+    std::string group_name) {
+  auto group = c10d::resolve_process_group(group_name);
+  auto work = group->recv(inputs, src, tag);
+  for (const auto& tensor : inputs) {
+    c10d::register_work(tensor, work);
+  }
+  return inputs;
+}
+
 } // namespace c10d
 
 TORCH_LIBRARY(_c10d_functional, m) {
@@ -359,6 +386,18 @@ TORCH_LIBRARY(_c10d_functional, m) {
       "broadcast_(Tensor(a!) input, int src, str group_name) -> Tensor(a!)",
       torch::dispatch(
           c10::DispatchKey::CompositeExplicitAutograd, c10d::broadcast_),
+      {at::Tag::pt2_compliant_tag});
+
+  m.def(
+      "send(Tensor[] inputs, int dst, int tag, str group_name) -> Tensor[]",
+      torch::dispatch(
+          c10::DispatchKey::CompositeExplicitAutograd, c10d::send),
+      {at::Tag::pt2_compliant_tag});
+
+  m.def(
+      "recv(Tensor[] inputs, int src, int tag, str group_name) -> Tensor[]",
+      torch::dispatch(
+          c10::DispatchKey::CompositeExplicitAutograd, c10d::recv),
       {at::Tag::pt2_compliant_tag});
 
   m.def(

@@ -1401,21 +1401,21 @@ class PipelineStage(_PipelineStageBase):
             # if not first stage, then check if prev stage is on the same rank
             or self.stage_index_to_group_rank[self.stage_index - 1] == self.group_rank
         ):
-            logger.debug(
-                "Shape inference: stage %s skipping recv, because shape info passed in via `args`",
-                self.stage_index,
-            )
+            # logger.debug(
+            #     "Shape inference: stage %s skipping recv, because shape info passed in via `args`",
+            #     self.stage_index,
+            # )
             args = tree_map_only(torch.Tensor, lambda x: x.to("meta"), args)
         else:
             assert len(args) == 0, (
                 "Can't supply input args for shape inference on non-first stage"
             )
             objects = [None]
-            logger.debug(
-                "Shape inference: stage %s receiving from stage %s",
-                self.stage_index,
-                self.stage_index - 1,
-            )
+            # logger.debug(
+            #     "Shape inference: stage %s receiving from stage %s",
+            #     self.stage_index,
+            #     self.stage_index - 1,
+            # )
             dist.recv_object_list(
                 objects,
                 src=dist.get_global_rank(
@@ -1450,12 +1450,12 @@ class PipelineStage(_PipelineStageBase):
         outputs_meta = tuple(
             tree_map_only(torch.Tensor, lambda x: x.to("meta"), outputs)
         )
-        logger.debug(
-            "Shape inference: stage %s inputs %s, outputs %s",
-            self.stage_index,
-            self.inputs_meta,
-            outputs_meta,
-        )
+        # logger.debug(
+        #     "Shape inference: stage %s inputs %s, outputs %s",
+        #     self.stage_index,
+        #     self.inputs_meta,
+        #     outputs_meta,
+        # )
         self._configure_outputs_meta(outputs_meta)
 
         # Passing outputs to the next stage:
@@ -1470,18 +1470,19 @@ class PipelineStage(_PipelineStageBase):
         ):
             # Case (2) above: pass shape info via return value and caller passes it as args to next stage's
             # _shape_inference call
-            logger.debug(
-                "Shape inference: stage %s skipping send to next stage",
-                self.stage_index,
-            )
+            # logger.debug(
+            #     "Shape inference: stage %s skipping send to next stage",
+            #     self.stage_index,
+            # )
+            None
 
         else:
             # Case (1): send shapes via send operation, and ensure not to return it to the caller
-            logger.debug(
-                "Shape inference: stage %s sending to stage %s",
-                self.stage_index,
-                self.stage_index + 1,
-            )
+            # logger.debug(
+            #     "Shape inference: stage %s sending to stage %s",
+            #     self.stage_index,
+            #     self.stage_index + 1,
+            # )
             dist.send_object_list(
                 [outputs_meta],
                 dst=dist.get_global_rank(
