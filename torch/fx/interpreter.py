@@ -171,7 +171,10 @@ class Interpreter:
                 continue
 
             try:
+                import os
+                # os.environ["DISABLE_META_TENSOR"] = "True"
                 self.env[node] = self.run_node(node)
+                # del os.environ["DISABLE_META_TENSOR"]
             except Exception as e:
                 if self.extra_traceback:
                     msg = f"While executing {node.format_node()}"

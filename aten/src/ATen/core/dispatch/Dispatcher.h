@@ -774,14 +774,24 @@ C10_ALWAYS_INLINE_UNLESS_MOBILE Return Dispatcher::call(
   auto dispatchKeySet =
       op.operatorDef_->op.dispatchKeyExtractor()
           .template getDispatchKeySetUnboxed<Args...>(args...);
+  auto dispatchKeySetFinal = dispatchKeySet;
+  if (std::getenv("DISABLE_META_TENSOR") != nullptr &&
+      dispatchKeySet.has_backend(BackendComponent::MetaBit)) {
+    std::cout << "DISABLE_META TRIGGERED. Original key: " << dispatchKeySet.raw_repr() << std::endl;
+    auto dispatchKeySetRemoved = dispatchKeySet.remove_backend(BackendComponent::MetaBit);
+    dispatchKeySetFinal = dispatchKeySetRemoved.add(DispatchKey::CUDA);
+    std::cout.flush();
+  }
+
 #if defined(HAS_TORCH_SHOW_DISPATCH_TRACE) || !defined(NDEBUG)
   DispatchTraceNestingGuard debug_guard;
   if (show_dispatch_trace()) {
     detail::_print_dispatch_trace(
-        "[call]", toString(op.operator_name()), dispatchKeySet);
+        "[call]", toString(op.operator_name()), dispatchKeySetFinal);
+    std::cout.flush();
   }
 #endif
-  const KernelFunction& kernel = op.operatorDef_->op.lookup(dispatchKeySet);
+  const KernelFunction& kernel = op.operatorDef_->op.lookup(dispatchKeySetFinal);
 #ifndef PYTORCH_DISABLE_PER_OP_PROFILING
   auto step_callbacks =
       at::getStepCallbacksUnlessEmpty(at::RecordScope::FUNCTION);
@@ -790,7 +800,7 @@ C10_ALWAYS_INLINE_UNLESS_MOBILE Return Dispatcher::call(
     return callWithDispatchKeySlowPath<Return, Args...>(
         op,
         *step_callbacks,
-        dispatchKeySet,
+        dispatchKeySetFinal,
         kernel,
         std::forward<Args>(args)...);
   }
@@ -821,7 +831,7 @@ C10_ALWAYS_INLINE_UNLESS_MOBILE Return Dispatcher::call(
   }
 #else
   return kernel.template call<Return, Args...>(
-      op, dispatchKeySet, std::forward<Args>(args)...);
+      op, dispatchKeySetFinal, std::forward<Args>(args)...);
 #endif // FBCODE_CAFFE2
 }
 

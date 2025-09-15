@@ -1845,61 +1845,74 @@ class FakeTensorMode(TorchDispatchMode):
         """
         from torch._higher_order_ops.utils import registered_hop_fake_fns
         from torch.fx.experimental.symbolic_shapes import has_free_unbacked_symbols
+        # Temporarily set DISABLE_META_TENSOR to "1" within this context
+        @contextlib.contextmanager
+        def disable_meta_tensor_env():
+            old_value = os.environ.get("DISABLE_META_TENSOR", None)
+            if old_value is not None:
+                del os.environ["DISABLE_META_TENSOR"]
+            try:
+                yield
+            finally:
+                if old_value is not None:
+                    os.environ["DISABLE_META_TENSOR"] = old_value
 
-        # For hops, lets look at the output tensor to find any unbacked symints.
-        # If there are none, then we rely on the existing checks to validate
-        # caching.
-        # NB: Note that the HOPs that sta alive till FakeTensor are functional,
-        # once they support mutations, we will have to revisit this logic.
-        if (
-            isinstance(func, torch._ops.HigherOrderOperator)
-            and func in registered_hop_fake_fns
-        ):
-            assert isinstance(output, tuple)
-            non_cacheable = any(
-                isinstance(o, (torch.Tensor, torch.SymInt))
-                and has_free_unbacked_symbols(o)
-                for o in output
-            )
-            if non_cacheable:
-                raise _BypassDispatchCache(f"unbacked symbol in HOP {func} output")
+        with disable_meta_tensor_env():
 
-        if isinstance(output, (int, torch.SymInt, type(None))):
-            output_info = _DispatchCacheEntryOutputInfo(
-                inplace_idx=None, metadata=None, view_idx=None, constant_value=output
-            )
-            return _DispatchCacheValidEntry(
-                output_infos=(output_info,), is_output_tuple=False
-            )
+            # For hops, lets look at the output tensor to find any unbacked symints.
+            # If there are none, then we rely on the existing checks to validate
+            # caching.
+            # NB: Note that the HOPs that sta alive till FakeTensor are functional,
+            # once they support mutations, we will have to revisit this logic.
+            if (
+                isinstance(func, torch._ops.HigherOrderOperator)
+                and func in registered_hop_fake_fns
+            ):
+                assert isinstance(output, tuple)
+                non_cacheable = any(
+                    isinstance(o, (torch.Tensor, torch.SymInt))
+                    and has_free_unbacked_symbols(o)
+                    for o in output
+                )
+                if non_cacheable:
+                    raise _BypassDispatchCache(f"unbacked symbol in HOP {func} output")
 
-        if isinstance(output, tuple):
-            for out_element in output:
+            if isinstance(output, (int, torch.SymInt, type(None))):
+                output_info = _DispatchCacheEntryOutputInfo(
+                    inplace_idx=None, metadata=None, view_idx=None, constant_value=output
+                )
+                return _DispatchCacheValidEntry(
+                    output_infos=(output_info,), is_output_tuple=False
+                )
+
+            if isinstance(output, tuple):
+                for out_element in output:
+                    self._validate_output_for_cache_entry(
+                        state, key, func, args, kwargs, out_element
+                    )
+            else:
                 self._validate_output_for_cache_entry(
-                    state, key, func, args, kwargs, out_element
+                    state, key, func, args, kwargs, output
                 )
-        else:
-            self._validate_output_for_cache_entry(
-                state, key, func, args, kwargs, output
-            )
 
-        if isinstance(output, tuple):
-            output_infos = [
-                self._get_output_info_for_cache_entry(
-                    state, key, func, args, kwargs, out_elem
+            if isinstance(output, tuple):
+                output_infos = [
+                    self._get_output_info_for_cache_entry(
+                        state, key, func, args, kwargs, out_elem
+                    )
+                    for out_elem in output
+                ]
+                return _DispatchCacheValidEntry(
+                    output_infos=tuple(output_infos), is_output_tuple=True
                 )
-                for out_elem in output
-            ]
-            return _DispatchCacheValidEntry(
-                output_infos=tuple(output_infos), is_output_tuple=True
-            )
 
-        else:
-            output_info = self._get_output_info_for_cache_entry(
-                state, key, func, args, kwargs, output
-            )
-            return _DispatchCacheValidEntry(
-                output_infos=(output_info,), is_output_tuple=False
-            )
+            else:
+                output_info = self._get_output_info_for_cache_entry(
+                    state, key, func, args, kwargs, output
+                )
+                return _DispatchCacheValidEntry(
+                    output_infos=(output_info,), is_output_tuple=False
+                )
 
     def _get_output_tensor_from_cache_entry(
         self,
@@ -1970,7 +1983,19 @@ class FakeTensorMode(TorchDispatchMode):
             assert isinstance(view_arg, FakeTensor)
             storage = view_arg.untyped_storage()
             with in_kernel_invocation_manager(self), maybe_suppress():
-                empty.set_(storage, storage_offset, shape, stride)
+                @contextlib.contextmanager
+                def disable_meta_tensor_env():
+                    old_value = os.environ.get("DISABLE_META_TENSOR", None)
+                    if old_value is not None:
+                        del os.environ["DISABLE_META_TENSOR"]
+                    try:
+                        yield
+                    finally:
+                        if old_value is not None:
+                            os.environ["DISABLE_META_TENSOR"] = old_value
+
+                with disable_meta_tensor_env():
+                    empty.set_(storage, storage_offset, shape, stride)
 
         return FakeTensor(self, empty, metadata.device)
 
