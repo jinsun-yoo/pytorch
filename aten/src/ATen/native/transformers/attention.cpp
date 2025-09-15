@@ -731,8 +731,10 @@ Tensor scaled_dot_product_attention(
     choice_int = _fused_sdp_choice_stub(query_.device().type(),
           query_, key, value, attn_mask_, dropout_p, is_causal, scale, enable_gqa);
   }
-  const auto query_device_type = query_.device().type();
-  const auto backend = static_cast<SDPBackend>(choice_int);
+  auto query_device_type = query_.device().type();
+  auto backend = static_cast<SDPBackend>(choice_int);
+  backend = SDPBackend::flash_attention;
+  query_device_type = DeviceType::CUDA;
   const auto convert_attn_func = backend != SDPBackend::cudnn_attention ? convert_boolean_attn_mask : convert_boolean_attn_mask_cudnn;
   auto attn_mask = convert_attn_func(attn_mask_, query_.dtype());
   switch (backend) {
