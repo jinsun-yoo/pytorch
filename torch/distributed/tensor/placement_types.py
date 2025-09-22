@@ -180,9 +180,9 @@ class Shard(Placement):
         output = torch.empty_like(scatter_list[mesh_dim_local_rank])
 
         # perform scatter from the src_data_rank as data source when it is not None
-        mesh_scatter(
-            output, scatter_list, mesh, mesh_dim=mesh_dim, group_src=src_data_rank
-        )
+        # mesh_scatter(
+        #     output, scatter_list, mesh, mesh_dim=mesh_dim, group_src=src_data_rank
+        # )
 
         # Only unpad if the local_tensor was padded on the dimension.
         if pad_sizes[mesh_dim_local_rank] > 0:
